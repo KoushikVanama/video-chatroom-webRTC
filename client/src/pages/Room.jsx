@@ -69,16 +69,51 @@ const RoomPage = () => {
     });
   }, []);
 
+  const handleNegoNeeded = useCallback(async () => {
+    const offer = await peer.getOffer();
+    socket.emit("peer:nego:needed", { offer, to: remoteSocketId });
+  }, [remoteSocketId, socket]);
+
+  const handleNegoNeededIncoming = useCallback(
+    async ({ from, offer }) => {
+      const ans = await peer.getAnswer(offer);
+      socket.emit("peer:nego:done", { to: from, ans });
+    },
+    [socket]
+  );
+
+  const handleNegoNeededFinal = useCallback(async ({ ans }) => {
+    await peer.setLocalDescription(ans);
+  }, []);
+
+  useEffect(() => {
+    peer.peer.addEventListener("negotiationneeded", handleNegoNeeded);
+    return () => {
+      peer.peer.removeEventListener("negotiationneeded", handleNegoNeeded);
+    };
+  }, [handleNegoNeeded, remoteSocketId, socket]);
+
   useEffect(() => {
     socket.on("user:joined", handleUserJoined);
     socket.on("incoming:call", handleIncomingCall);
     socket.on("call:accepted", handleCallAccepted);
+    socket.on("peer:nego:needed", handleNegoNeededIncoming);
+    socket.on("peer:nego:final", handleNegoNeededFinal);
     return () => {
       socket.off("user:joined", handleUserJoined);
-      socket.on("incoming:call", handleIncomingCall);
-      socket.on("call:accepted", handleCallAccepted);
+      socket.off("incoming:call", handleIncomingCall);
+      socket.off("call:accepted", handleCallAccepted);
+      socket.off("peer:nego:needed", handleNegoNeededIncoming);
+      socket.off("peer:nego:final", handleNegoNeededFinal);
     };
-  }, [socket, handleUserJoined, handleIncomingCall, handleCallAccepted]);
+  }, [
+    socket,
+    handleUserJoined,
+    handleIncomingCall,
+    handleCallAccepted,
+    handleNegoNeededIncoming,
+    handleNegoNeededFinal,
+  ]);
 
   return (
     <div>
@@ -100,7 +135,7 @@ const RoomPage = () => {
       )}
       {remoteStream && (
         <>
-          <h1>My Stream</h1>
+          <h1>Remote Stream</h1>
           <ReactPlayer
             playing
             muted
