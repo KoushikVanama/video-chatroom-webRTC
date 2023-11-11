@@ -38,4 +38,4 @@ class PeerService {
   }
 }
 
-export default new PeerService();
+export default PeerService;
